@@ -160,14 +160,17 @@ export class LoadTester {
       // Randomly choose between kind 10002 and kind 3 (evenly)
       const eventKind = Math.random() < 0.5 ? 10002 : 3;
 
+      // Get current timestamp for this event to ensure unique creation time
+      const created_at = Math.floor(Date.now() / 1000);
+      
       let event;
 
       if (eventKind === 10002) {
         // Generate a relay list metadata event
-        event = this.generateRelayListEvent(keypair);
+        event = this.generateRelayListEvent(keypair, created_at);
       } else {
         // Generate a contact list event
-        event = this.generateContactListEvent(keypair);
+        event = this.generateContactListEvent(keypair, created_at);
       }
 
       // Sign the event
@@ -192,7 +195,7 @@ export class LoadTester {
     return tags;
   }
 
-  generateRelayListEvent(keypair) {
+  generateRelayListEvent(keypair, created_at) {
     // Generate a kind 10002 event with random relay URLs
     const relayCount = 5 + Math.floor(Math.random() * 10); // 5-14 relays
     const relaysUrls = [];
@@ -206,14 +209,14 @@ export class LoadTester {
 
     return {
       kind: 10002,
-      created_at: Math.floor(Date.now() / 1000),
+      created_at: created_at,
       content: '',
       tags,
       pubkey: keypair.publicKey,
     };
   }
 
-  generateContactListEvent(keypair) {
+  generateContactListEvent(keypair, created_at) {
     // Generate a kind 3 event with random contacts from our pubkey list
     const contactCount = 5 + Math.floor(Math.random() * 20); // 5-24 contacts
     const tags = [];
@@ -228,7 +231,7 @@ export class LoadTester {
 
     return {
       kind: 3,
-      created_at: Math.floor(Date.now() / 1000),
+      created_at: created_at,
       content: '',
       tags: tags,
       pubkey: keypair.publicKey
