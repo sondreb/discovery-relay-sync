@@ -44,11 +44,6 @@ export function parseArgs() {
       default: 60,
       description: 'Duration of load test in seconds'
     })
-    .option('threads', {
-      type: 'number',
-      default: 1,
-      description: 'Number of parallel threads for load testing'
-    })
     .help('h')
     .alias('h', 'help')
     .argv;
@@ -64,7 +59,7 @@ export function parseArgs() {
     loadTest: argv.loadTest || false,
     eventsPerSecond: argv.eventsPerSecond || 10,
     testDuration: argv.testDuration || 60,
-    threads: argv.threads || 1
+    threads: 1
   };
 
   // Load configuration from file if specified

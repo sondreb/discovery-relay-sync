@@ -28,7 +28,7 @@ async function main() {
       if (config.threads === 1 && config.eventsPerSecond > 1) {
         // Due to Nostr timestamp limitations (1 event per second per keypair),
         // we need as many threads as events per second we want to achieve
-        config.threads = Math.min(100, config.eventsPerSecond); // Cap at 100 threads for safety
+        config.threads = config.eventsPerSecond;
         logger.info(`Auto-scaling to ${config.threads} threads to achieve ${config.eventsPerSecond} events/second`);
       }
       
