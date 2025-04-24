@@ -8,7 +8,8 @@ export class LoadTester {
     this.logger = logger;
     this.statsTracker = new StatsTracker();
     this.targetRelays = [];
-    this.keypairs = [];
+    this.keypair = null;   // Single keypair instead of an array
+    this.otherPubkeys = []; // Array of pubkeys for creating contacts
     this.running = false;
     this.reportInterval = null;
     this.testInterval = null;
@@ -19,8 +20,11 @@ export class LoadTester {
     this.running = true;
 
     try {
-      // Generate random keypairs
-      this.generateKeypairs();
+      // Generate a single keypair
+      this.generateKeypair();
+      
+      // Generate some random pubkeys for contact lists (not actual keypairs)
+      this.generateRandomPubkeys();
 
       // Connect to target relays
       await this.connectToTargetRelays();
@@ -71,17 +75,36 @@ export class LoadTester {
     this.logger.info('Load test completed');
   }
 
-  generateKeypairs() {
-    this.logger.info(`Generating ${this.config.keypairs} random keypairs...`);
+  generateKeypair() {
+    // Check if a specific threadId is provided and use it as a seed for consistent generation
+    let threadId = this.config.threadId || 1;
+    
+    this.logger.info(`Generating keypair for thread ${threadId}...`);
 
-    for (let i = 0; i < this.config.keypairs; i++) {
-      const privateKey = generateSecretKey();
-      const publicKey = getPublicKey(privateKey);
+    // Generate a single keypair
+    const privateKey = generateSecretKey(); 
+    const publicKey = getPublicKey(privateKey);
+    
+    this.keypair = { privateKey, publicKey };
 
-      this.keypairs.push({ privateKey, publicKey });
+    this.logger.info(`Generated keypair with pubkey: ${publicKey.substring(0, 8)}...`);
+  }
+  
+  generateRandomPubkeys() {
+    // Generate random pubkeys (not actual keypairs) for contact lists
+    const numPubkeys = 50; // Number of random pubkeys to generate
+    this.logger.info(`Generating ${numPubkeys} random pubkeys for contacts...`);
+    
+    for (let i = 0; i < numPubkeys; i++) {
+      // Generate a fake pubkey (32 bytes of random hex)
+      const fakePubkey = Array.from({length: 64}, () => 
+        '0123456789abcdef'[Math.floor(Math.random() * 16)]
+      ).join('');
+      
+      this.otherPubkeys.push(fakePubkey);
     }
-
-    this.logger.info(`Generated ${this.keypairs.length} keypairs`);
+    
+    this.logger.info(`Generated ${this.otherPubkeys.length} random pubkeys for contacts`);
   }
 
   async connectToTargetRelays() {
@@ -131,9 +154,8 @@ export class LoadTester {
     if (!this.running || this.targetRelays.length === 0) return;
 
     try {
-      // Choose a random keypair
-      const keypairIndex = Math.floor(Math.random() * this.keypairs.length);
-      const keypair = this.keypairs[keypairIndex];
+      // Use the single keypair for all events
+      const keypair = this.keypair;
 
       // Randomly choose between kind 10002 and kind 3 (evenly)
       const eventKind = Math.random() < 0.5 ? 10002 : 3;
@@ -192,20 +214,16 @@ export class LoadTester {
   }
 
   generateContactListEvent(keypair) {
-    // Generate a kind 3 event with random contacts from our keypairs
+    // Generate a kind 3 event with random contacts from our pubkey list
     const contactCount = 5 + Math.floor(Math.random() * 20); // 5-24 contacts
     const tags = [];
 
-    // Select random keypairs as contacts
-    const availableKeypairs = [...this.keypairs].filter(k => k.publicKey !== keypair.publicKey);
+    // Get a random subset of our other pubkeys for contacts
+    const shuffledPubkeys = [...this.otherPubkeys].sort(() => 0.5 - Math.random());
+    const selectedPubkeys = shuffledPubkeys.slice(0, Math.min(contactCount, shuffledPubkeys.length));
 
-    for (let i = 0; i < Math.min(contactCount, availableKeypairs.length); i++) {
-      const randomIndex = Math.floor(Math.random() * availableKeypairs.length);
-      const contact = availableKeypairs.splice(randomIndex, 1)[0];
-
-      if (contact) {
-        tags.push(['p', contact.publicKey, 'wss://relay.example.com', Math.random() > 0.5 ? 'follow' : '']);
-      }
+    for (const pubkey of selectedPubkeys) {
+      tags.push(['p', pubkey, 'wss://relay.example.com', Math.random() > 0.5 ? 'follow' : '']);
     }
 
     return {
@@ -222,6 +240,8 @@ export class LoadTester {
   }
 
   async publishToTargetRelays(event) {
+    console.log('PUBLISH: ', event.created_at, event.id, event.kind, event.tags);
+
     // Randomly select some or all target relays to publish to
     const relayCount = Math.max(1, Math.floor(Math.random() * this.targetRelays.length));
     const shuffledRelays = [...this.targetRelays].sort(() => 0.5 - Math.random());

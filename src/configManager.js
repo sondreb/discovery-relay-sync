@@ -44,11 +44,6 @@ export function parseArgs() {
       default: 60,
       description: 'Duration of load test in seconds'
     })
-    .option('keypairs', {
-      type: 'number',
-      default: 50,
-      description: 'Number of random keypairs to generate for testing'
-    })
     .option('threads', {
       type: 'number',
       default: 1,
@@ -69,7 +64,6 @@ export function parseArgs() {
     loadTest: argv.loadTest || false,
     eventsPerSecond: argv.eventsPerSecond || 10,
     testDuration: argv.testDuration || 60,
-    keypairs: argv.keypairs || 50,
     threads: argv.threads || 1
   };
 
