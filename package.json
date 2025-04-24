@@ -1,0 +1,28 @@
+{
+  "name": "discovery-relay-sync",
+  "version": "1.0.0",
+  "description": "Utility used to sync kind 10002 from other relays and publish to Discovery Relay (also includes load testing)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nostr",
+    "relay",
+    "sync",
+    "discovery",
+    "kind10002",
+    "kind3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "nostr-tools": "^2.0.0",
+    "websocket-polyfill": "^1.0.0",
+    "winston": "^3.17.0",
+    "ws": "^8.18.1",
+    "yargs": "^17.7.2"
+  },
+  "type": "module"
+}
