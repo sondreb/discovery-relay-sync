@@ -7,6 +7,7 @@ import { LoadTester } from './src/loadTester.js';
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { AggregateStatsTracker } from './src/aggregateStatsTracker.js';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -69,8 +70,14 @@ async function runMultithreadedTest(config, logger) {
   // Keep track of all worker threads
   const workers = [];
   
+  // Create aggregate stats tracker
+  const aggregateStats = new AggregateStatsTracker();
+  
+  // Flag to suppress individual thread reports
+  const suppressThreadReports = threadCount > 1;
+  
   // Handle graceful shutdown
-  const shutdown = async () => {
+  const shutdown = async (showFinalReport = true) => {
     logger.info('Shutdown signal received - stopping all worker threads');
     
     // Send termination message to all workers
@@ -81,10 +88,21 @@ async function runMultithreadedTest(config, logger) {
     // Wait a moment for workers to clean up
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    if (showFinalReport) {
+      // Generate and display the aggregate report
+      const aggregatedStats = aggregateStats.aggregateAllThreadStats();
+      const finalReport = aggregateStats.endSession();
+      logger.info('Final aggregate load test report:', finalReport.summary);
+      
+      // Display a nicely formatted report
+      const formattedReport = aggregateStats.formatConsoleReport();
+      logger.info(`\n${formattedReport}`);
+    }
+    
     process.exit(0);
   };
   
-  process.on('SIGINT', shutdown);
+  process.on('SIGINT', () => shutdown());
   
   // Create worker threads
   for (let i = 0; i < threadCount; i++) {
@@ -106,7 +124,9 @@ async function runMultithreadedTest(config, logger) {
     });
     
     worker.on('exit', code => {
-      logger.info(`Worker thread ${i + 1} exited with code ${code}`);
+      if (!suppressThreadReports) {
+        logger.info(`Worker thread ${i + 1} exited with code ${code}`);
+      }
       
       // Remove from workers array
       const index = workers.indexOf(worker);
@@ -117,17 +137,29 @@ async function runMultithreadedTest(config, logger) {
       // If all workers are done, exit main process
       if (workers.length === 0) {
         logger.info('All worker threads completed');
-        process.exit(0);
+        shutdown(true);
       }
     });
     
     worker.on('message', message => {
       if (message.type === 'log') {
-        // Pass through log messages from worker
-        logger[message.level](`[Thread ${i + 1}] ${message.message}`, message.meta);
+        // Only pass through critical log messages if we're suppressing thread reports
+        if (suppressThreadReports && (message.level === 'error' || message.level === 'warn')) {
+          logger[message.level](`[Thread ${i + 1}] ${message.message}`, message.meta);
+        } else if (!suppressThreadReports) {
+          logger[message.level](`[Thread ${i + 1}] ${message.message}`, message.meta);
+        }
       } else if (message.type === 'stats') {
-        // Log stats from worker
-        logger.info(`[Thread ${i + 1}] Stats: ${JSON.stringify(message.stats)}`);
+        // Collect stats from worker threads
+        aggregateStats.updateThreadStats(i + 1, message.stats);
+        
+        // Only log individual stats if we're not suppressing thread reports
+        if (!suppressThreadReports) {
+          logger.info(`[Thread ${i + 1}] Stats: ${JSON.stringify(message.stats)}`);
+        }
+      } else if (message.type === 'final_stats') {
+        // Receive final stats from a worker thread
+        aggregateStats.updateThreadStats(i + 1, message.stats);
       }
     });
     
@@ -136,14 +168,30 @@ async function runMultithreadedTest(config, logger) {
   
   logger.info(`${threadCount} worker threads started`);
   
+  // Set up a periodic aggregate stats report if we have multiple threads
+  if (threadCount > 1) {
+    const reportInterval = setInterval(() => {
+      if (workers.length === 0) {
+        clearInterval(reportInterval);
+        return;
+      }
+      
+      // Aggregate and report overall stats periodically
+      const stats = aggregateStats.aggregateAllThreadStats();
+      const runningTime = stats.runningTime.toFixed(2);
+      const eventsPublished = stats.eventsPublished.total;
+      const throughput = (eventsPublished / stats.runningTime).toFixed(2);
+      
+      logger.info(`Aggregate stats - Runtime: ${runningTime}s, Events: ${eventsPublished}, Throughput: ${throughput} events/s`);
+    }, 15000); // Every 15 seconds
+  }
+  
   // Wait until the test duration completes
   await new Promise(resolve => setTimeout(resolve, config.testDuration * 1000));
   
   // Send shutdown signal to all workers
   logger.info('Test duration completed, shutting down worker threads');
-  for (const worker of workers) {
-    worker.postMessage({ type: 'shutdown' });
-  }
+  await shutdown();
 }
 
 main();

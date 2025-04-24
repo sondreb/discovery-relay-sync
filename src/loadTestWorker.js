@@ -45,13 +45,28 @@ async function runLoadTest() {
         if (!this.running) return;
         
         const stats = this.statsTracker.getStats();
-        if (parentPort && stats && stats.summary) {
+        if (parentPort && stats) {
           parentPort.postMessage({
             type: 'stats',
-            stats: stats.summary
+            stats: stats
           });
         }
       }, 5000);
+    };
+    
+    // Override the stop method to send final stats before shutting down
+    const originalStop = loadTester.stop;
+    loadTester.stop = async function() {
+      await originalStop.call(this);
+      
+      // Send final stats to the main thread
+      if (parentPort) {
+        const finalStats = this.statsTracker.getStats();
+        parentPort.postMessage({
+          type: 'final_stats',
+          stats: finalStats
+        });
+      }
     };
     
     // Start the load test
