@@ -70,8 +70,9 @@ export class LoadTester {
     this.logger.info('Final load test report:', finalReport);
     
     // Also display the nicely formatted console report
+    // Use a single string argument instead of two arguments to avoid logger treating formattedReport as metadata
     const formattedReport = this.statsTracker.formatConsoleReport();
-    this.logger.info('Formatted final report:', formattedReport);
+    this.logger.info(`\nFormatted final report: ${formattedReport}`);
 
     // Disconnect from all relays
     const disconnectPromises = this.targetRelays.map(relay => relay.disconnect());
@@ -349,8 +350,9 @@ export class LoadTester {
       this.statsTracker.reportCounter++;
       if (this.statsTracker.reportCounter % 12 === 0) {
         // Display formatted report every minute
+        // Using template string to make sure the report is treated as a message, not metadata
         const formattedReport = this.statsTracker.formatConsoleReport();
-        this.logger.info(formattedReport);
+        this.logger.info(`${formattedReport}`);
       }
     }, 5000); // 5 seconds
   }
