@@ -160,8 +160,7 @@ export class RelayConnector {
 
     try {
       const startTime = Date.now();
-      console.log('PUBLISH:', [this.url], event);
-      
+
       // pool.publish returns an array of promises
       const publishPromises = await this.pool.publish([this.url], event);
       

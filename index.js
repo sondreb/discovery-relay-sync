@@ -23,6 +23,14 @@ async function main() {
     if (config.loadTest) {
       logger.info('Running in load test mode');
       
+      // For load testing, calculate the optimal thread count if not explicitly specified
+      if (config.threads === 1 && config.eventsPerSecond > 1) {
+        // Due to Nostr timestamp limitations (1 event per second per keypair),
+        // we need as many threads as events per second we want to achieve
+        config.threads = Math.min(100, config.eventsPerSecond); // Cap at 100 threads for safety
+        logger.info(`Auto-scaling to ${config.threads} threads to achieve ${config.eventsPerSecond} events/second`);
+      }
+      
       if (config.threads > 1) {
         await runMultithreadedTest(config, logger);
       } else {
@@ -52,9 +60,11 @@ async function runMultithreadedTest(config, logger) {
   const threadCount = config.threads;
   logger.info(`Starting ${threadCount} load testing threads`);
   
-  // Calculate events per second per thread
-  const eventsPerSecondPerThread = Math.ceil(config.eventsPerSecond / threadCount);
-  logger.info(`Total events/sec: ${config.eventsPerSecond}, Per thread: ${eventsPerSecondPerThread}`);
+  // In Nostr, we can only do 1 event per second per keypair
+  // So each thread will produce exactly 1 event per second
+  // We don't need to divide events per second among threads
+  logger.info(`Each thread will publish 1 event per second (Nostr timestamp limitation)`);
+  logger.info(`Total throughput will be approximately ${threadCount} events/second with ${threadCount} threads`);
   
   // Keep track of all worker threads
   const workers = [];
@@ -80,8 +90,8 @@ async function runMultithreadedTest(config, logger) {
   for (let i = 0; i < threadCount; i++) {
     const threadConfig = {
       ...config,
-      // Adjust events per second for this thread
-      eventsPerSecond: eventsPerSecondPerThread,
+      // Set events per second to 1 for each thread
+      eventsPerSecond: 1,
       // Add thread ID for identification
       threadId: i + 1
     };

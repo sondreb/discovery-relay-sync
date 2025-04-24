@@ -13,6 +13,7 @@ export class LoadTester {
     this.running = false;
     this.reportInterval = null;
     this.testInterval = null;
+    this.lastEventTimestamp = 0; // Track the timestamp of the last event
   }
 
   async run() {
@@ -32,7 +33,7 @@ export class LoadTester {
       // Set up regular stats reporting
       this.setupStatsReporting();
 
-      // Start publishing events at the configured rate
+      // Start publishing events at 1 per second rate (Nostr limitation)
       this.startPublishing();
 
       // Set timer to end the test after specified duration
@@ -138,9 +139,15 @@ export class LoadTester {
   startPublishing() {
     if (!this.running) return;
 
-    const intervalMs = 1000 / this.config.eventsPerSecond;
+    // Always set interval to 1 second regardless of eventsPerSecond setting
+    // because Nostr timestamps have second-level precision
+    const intervalMs = 1000; // Fixed at 1 second
 
-    this.logger.info(`Publishing events at a rate of ${this.config.eventsPerSecond} per second (interval: ${intervalMs}ms)`);
+    this.logger.info(`Publishing events at a rate of 1 event per second per thread (Nostr timestamp limitation)`);
+    if (this.config.eventsPerSecond > 1) {
+      this.logger.info(`Note: Your configured rate of ${this.config.eventsPerSecond} events/second is being overridden to 1 event/second/thread.`);
+      this.logger.info(`To increase throughput, use multiple threads (--threads parameter).`);
+    }
 
     this.testInterval = setInterval(() => {
       if (!this.running) return;
@@ -157,20 +164,30 @@ export class LoadTester {
       // Use the single keypair for all events
       const keypair = this.keypair;
 
+      // Get current timestamp for this event
+      const now = Math.floor(Date.now() / 1000);
+      
+      // Ensure we don't create events with duplicate timestamps from the same keypair
+      if (now <= this.lastEventTimestamp) {
+        // Skip this interval as we've already published an event with this timestamp
+        this.logger.debug(`Skipping event generation, already published event with timestamp ${now}`);
+        return;
+      }
+
+      // Update the last event timestamp
+      this.lastEventTimestamp = now;
+      
       // Randomly choose between kind 10002 and kind 3 (evenly)
       const eventKind = Math.random() < 0.5 ? 10002 : 3;
-
-      // Get current timestamp for this event to ensure unique creation time
-      const created_at = Math.floor(Date.now() / 1000);
       
       let event;
 
       if (eventKind === 10002) {
         // Generate a relay list metadata event
-        event = this.generateRelayListEvent(keypair, created_at);
+        event = this.generateRelayListEvent(keypair, now);
       } else {
         // Generate a contact list event
-        event = this.generateContactListEvent(keypair, created_at);
+        event = this.generateContactListEvent(keypair, now);
       }
 
       // Sign the event
@@ -243,8 +260,8 @@ export class LoadTester {
   }
 
   async publishToTargetRelays(event) {
-    console.log('PUBLISH: ', event.created_at, event.id, event.kind, event.tags);
-
+    this.logger.debug(`Publishing event: timestamp=${event.created_at}, id=${event.id}, kind=${event.kind}`);
+    
     // Randomly select some or all target relays to publish to
     const relayCount = Math.max(1, Math.floor(Math.random() * this.targetRelays.length));
     const shuffledRelays = [...this.targetRelays].sort(() => 0.5 - Math.random());
