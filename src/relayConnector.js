@@ -101,18 +101,54 @@ export class RelayConnector {
   }
 
   async disconnect() {
-    if (this.connected) {
+    // if (this.connected) {
       this.logger.debug(`Disconnecting from relay: ${this.url}`);
 
-      // Close all subscriptions
-      for (const [subId, sub] of this.subscriptions.entries()) {
-        this.unsubscribe(subId);
+      try {
+        
+        // First, unsubscribe from all subscriptions
+        // const unsubPromises = [];
+        // for (const [subId, sub] of this.subscriptions.entries()) {
+        //   this.logger.debug(`Unsubscribing from subscription ${subId} for ${this.url}`);
+        //   const unsubPromise = new Promise(resolve => {
+        //     // Wait a short time to ensure CLOSE messages are received by the relay
+        //     setTimeout(() => {
+        //       try {
+        //         sub.unsub();
+        //         this.logger.debug(`Successfully unsubscribed from ${subId} for ${this.url}`);
+        //       } catch (e) {
+        //         this.logger.debug(`Error unsubscribing from ${subId}: ${e.message}`);
+        //       }
+        //       resolve();
+        //     }, 100);
+        //   });
+        //   unsubPromises.push(unsubPromise);
+        //   this.subscriptions.delete(subId);
+        // }
+        
+        // Wait for all unsubscribe operations to complete
+        // await Promise.all(unsubPromises);
+        
+        // Pause briefly to allow any pending messages to be processed
+        // await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Now close the pool connection to this relay
+        this.logger.debug(`Closing pool connection to ${this.url}`);
+        this.pool.close([this.url]);
+        
+        // Wait a bit more to let closing handshake complete
+        // await new Promise(resolve => setTimeout(resolve, 200));
+        
+        this.connected = false;
+        this.logger.info(`Successfully disconnected from relay: ${this.url}`);
+        this.statsTracker.recordConnectionStatus(this.url, 'disconnected');
+      } catch (error) {
+        this.logger.error(`Error during disconnect from relay ${this.url}:`, error);
+        // Still mark as disconnected even if there was an error
+        this.connected = false;
+        this.statsTracker.recordConnectionStatus(this.url, 'disconnected');
       }
-
-      // Close the pool connection to this relay
-      this.pool.close([this.url]);
-      this.connected = false;
-    }
+    // }
   }
 
   subscribe(filters) {

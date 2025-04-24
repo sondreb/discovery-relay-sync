@@ -74,8 +74,8 @@ export class LoadTester {
     const formattedReport = this.statsTracker.formatConsoleReport();
     this.logger.info(`\nFormatted final report: ${formattedReport}`);
 
-    // Disconnect from all relays
     const disconnectPromises = this.targetRelays.map(relay => relay.disconnect());
+
     await Promise.all(disconnectPromises);
 
     this.logger.info('Load test completed');
