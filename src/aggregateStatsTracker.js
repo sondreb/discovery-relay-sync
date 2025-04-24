@@ -48,13 +48,13 @@ export class AggregateStatsTracker {
   }
 
   updateThreadStats(threadId, threadStats) {
-    // Keep track of stats for each thread
-    this.stats.threadStats[threadId] = threadStats;
-    
     // Update the thread count if this is a new thread
-    if (!this.stats.threadStats[threadId]) {
+    if (!this.stats.threadStats.hasOwnProperty(threadId)) {
       this.stats.threadCount++;
     }
+    
+    // Keep track of stats for each thread
+    this.stats.threadStats[threadId] = threadStats;
   }
 
   aggregateAllThreadStats() {

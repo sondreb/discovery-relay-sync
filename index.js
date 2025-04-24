@@ -178,9 +178,10 @@ async function runMultithreadedTest(config, logger) {
       
       // Aggregate and report overall stats periodically
       const stats = aggregateStats.aggregateAllThreadStats();
-      const runningTime = stats.runningTime.toFixed(2);
-      const eventsPublished = stats.eventsPublished.total;
-      const throughput = (eventsPublished / stats.runningTime).toFixed(2);
+      const combinedStats = aggregateStats.getStats(); // Get processed stats with calculated fields
+      const runningTime = combinedStats.runningTime.toFixed(2);
+      const eventsPublished = combinedStats.eventsPublished.total;
+      const throughput = (eventsPublished / combinedStats.runningTime).toFixed(2);
       
       logger.info(`Aggregate stats - Runtime: ${runningTime}s, Events: ${eventsPublished}, Throughput: ${throughput} events/s`);
     }, 15000); // Every 15 seconds
