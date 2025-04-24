@@ -161,6 +161,53 @@ export class StatsTracker {
     };
   }
 
+  formatConsoleReport() {
+    const stats = this.getStats();
+    const report = this.generateReport();
+    
+    // Create a nicely formatted string for console output
+    let formattedReport = '\n========== STATISTICS REPORT ==========\n';
+    
+    // Summary section
+    formattedReport += '--- SUMMARY ---\n';
+    formattedReport += `Runtime: ${report.summary.runningTime}\n`;
+    formattedReport += `Events published: ${report.summary.eventsPublished}\n`;
+    formattedReport += `Events received: ${report.summary.eventsReceived}\n`;
+    formattedReport += `Throughput: ${report.summary.throughput}\n`;
+    formattedReport += `Error count: ${report.summary.errors}\n`;
+    
+    // Relay details
+    formattedReport += '\n--- RELAY DETAILS ---\n';
+    formattedReport += 'Published events by relay:\n';
+    Object.entries(stats.eventsPublished.byRelay).forEach(([relay, count]) => {
+      formattedReport += `  ${relay}: ${count} events\n`;
+    });
+    
+    // Event type breakdown
+    formattedReport += '\n--- EVENT TYPES ---\n';
+    formattedReport += `Kind 3 events: ${stats.eventsPublished.byKind['3']}\n`;
+    formattedReport += `Kind 10002 events: ${stats.eventsPublished.byKind['10002']}\n`;
+    
+    // Errors if any
+    if (stats.errors.total > 0) {
+      formattedReport += '\n--- ERRORS ---\n';
+      Object.entries(stats.errors.byType).forEach(([type, count]) => {
+        formattedReport += `  ${type}: ${count}\n`;
+      });
+    }
+    
+    // Bandwidth usage estimate
+    formattedReport += '\n--- BANDWIDTH USAGE ---\n';
+    const sentKB = (stats.bandwidthEstimate.bytesSent / 1024).toFixed(2);
+    const receivedKB = (stats.bandwidthEstimate.bytesReceived / 1024).toFixed(2);
+    formattedReport += `Sent: ${sentKB} KB\n`;
+    formattedReport += `Received: ${receivedKB} KB\n`;
+    
+    formattedReport += '======================================\n';
+    
+    return formattedReport;
+  }
+
   endSession() {
     this.stats.endTime = Date.now();
     return this.generateReport();

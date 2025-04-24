@@ -45,7 +45,7 @@ async function runLoadTest() {
         if (!this.running) return;
         
         const stats = this.statsTracker.getStats();
-        if (parentPort) {
+        if (parentPort && stats && stats.summary) {
           parentPort.postMessage({
             type: 'stats',
             stats: stats.summary

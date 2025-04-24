@@ -68,6 +68,10 @@ export class LoadTester {
     // Generate final report
     const finalReport = this.statsTracker.endSession();
     this.logger.info('Final load test report:', finalReport);
+    
+    // Also display the nicely formatted console report
+    const formattedReport = this.statsTracker.formatConsoleReport();
+    this.logger.info('Formatted final report:', formattedReport);
 
     // Disconnect from all relays
     const disconnectPromises = this.targetRelays.map(relay => relay.disconnect());
@@ -336,7 +340,18 @@ export class LoadTester {
 
       this.logger.info(`Success rate: ${successRate}%`);
       this.logger.info(`Current throughput: ${stats.throughput.eventsPerSecond.toFixed(2)} events/s`);
-
+      
+      // Log nicely formatted stats every minute (every 12th report at 5-second intervals)
+      if (this.statsTracker.reportCounter === undefined) {
+        this.statsTracker.reportCounter = 0;
+      }
+      
+      this.statsTracker.reportCounter++;
+      if (this.statsTracker.reportCounter % 12 === 0) {
+        // Display formatted report every minute
+        const formattedReport = this.statsTracker.formatConsoleReport();
+        this.logger.info(formattedReport);
+      }
     }, 5000); // 5 seconds
   }
 }
