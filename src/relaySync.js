@@ -10,8 +10,11 @@ export class RelaySync {
     this.sourceRelays = [];
     this.targetRelays = [];
     this.processedEvents = new Set(); // For deduplication
+    this.eventQueue = []; // Queue to store events before processing
     this.running = false;
     this.reportInterval = null;
+    this.queueProcessingInterval = null;
+    this.isProcessingQueue = false;
   }
   
   async start() {
@@ -28,6 +31,9 @@ export class RelaySync {
       // Set up regular stats reporting
       this.setupStatsReporting();
       
+      // Set up queue processing
+      this.setupQueueProcessing();
+      
       return true;
     } catch (error) {
       this.logger.error('Failed to start relay sync:', error);
@@ -39,10 +45,15 @@ export class RelaySync {
     this.logger.info('Stopping relay sync...');
     this.running = false;
     
-    // Clear reporting interval
+    // Clear intervals
     if (this.reportInterval) {
       clearInterval(this.reportInterval);
       this.reportInterval = null;
+    }
+    
+    if (this.queueProcessingInterval) {
+      clearInterval(this.queueProcessingInterval);
+      this.queueProcessingInterval = null;
     }
     
     // Generate final report
@@ -67,11 +78,18 @@ export class RelaySync {
         relayUrl, 
         {
           reconnectInterval: this.config.reconnectInterval,
-          maxRetries: this.config.maxRetries
+          maxRetries: this.config.maxRetries,
+          isSourceRelay: true  // Mark as source relay
         },
         this.logger,
         this.statsTracker
       );
+      
+      // Set up event handler before connecting
+      relay.onEvent = (event) => {
+        // console.log('Received event from source relay:', relayUrl, event);
+        this.handleIncomingEvent(relayUrl, event);
+      };
       
       const connected = await relay.connect();
       
@@ -79,19 +97,7 @@ export class RelaySync {
         this.sourceRelays.push(relay);
         
         // Subscribe to kinds 10002 and 3
-        // const sub = relay.subscribe([
-        //   { kinds: [10002, 3] }
-        // ]);
-        
-        // if (sub) {
-        //   sub.on('event', event => {
-        //     this.handleIncomingEvent(relayUrl, event);
-        //   });
-          
-        //   sub.on('eose', () => {
-        //     this.logger.debug(`End of stored events from ${relayUrl}`);
-        //   });
-        // }
+        relay.subscribe({ kinds: [10002, 3] });
       }
     }
     
@@ -110,7 +116,8 @@ export class RelaySync {
         relayUrl,
         {
           reconnectInterval: this.config.reconnectInterval,
-          maxRetries: this.config.maxRetries
+          maxRetries: this.config.maxRetries,
+          isSourceRelay: false  // Mark as target relay
         },
         this.logger,
         this.statsTracker
@@ -147,12 +154,13 @@ export class RelaySync {
       return;
     }
     
+    // Not needed, nostr-tools already handles this.
     // Verify signature
-    if (!verifyEvent(event)) {
-      this.logger.warn(`Skipping event ${eventId} with invalid signature`);
-      this.statsTracker.recordError('invalid_signature');
-      return;
-    }
+    // if (!verifyEvent(event)) {
+    //   this.logger.warn(`Skipping event ${eventId} with invalid signature`);
+    //   this.statsTracker.recordError('invalid_signature');
+    //   return;
+    // }
     
     // Record this event as received
     this.statsTracker.recordEventReceived(relayUrl, event);
@@ -160,13 +168,56 @@ export class RelaySync {
     // Mark as processed to avoid duplicates
     this.processedEvents.add(eventId);
     
-    // Publish to target relays
-    this.publishToTargetRelays(event);
+    // Add to event queue instead of publishing directly
+    this.eventQueue.push(event);
+  }
+  
+  setupQueueProcessing() {
+    // Process the queue every 100ms
+    this.queueProcessingInterval = setInterval(() => {
+      if (!this.running || this.isProcessingQueue) return;
+      
+      this.processEventQueue();
+    }, 100); // 100ms
+  }
+  
+  async processEventQueue() {
+    if (this.eventQueue.length === 0) return;
+    
+    this.isProcessingQueue = true;
+    
+    try {
+      // Get a batch of events (limit batch size to prevent blocking)
+      const batchSize = Math.min(this.eventQueue.length, 50);
+      const batch = this.eventQueue.splice(0, batchSize);
+      
+      this.logger.debug(`Processing ${batch.length} events from queue (${this.eventQueue.length} remaining)`);
+      
+      // Process each event in the batch
+      for (const event of batch) {
+        await this.publishToTargetRelays(event);
+      }
+    } catch (error) {
+      this.logger.error('Error processing event queue:', error);
+    } finally {
+      this.isProcessingQueue = false;
+    }
   }
   
   async publishToTargetRelays(event) {
     const publishPromises = this.targetRelays.map(relay => relay.publish(event));
-    await Promise.allSettled(publishPromises);
+    const results = await Promise.allSettled(publishPromises);
+    
+    // Log success/failure stats
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    if (successful > 0) {
+      this.statsTracker.recordEventPublished(event, successful);
+    }
+    
+    if (successful < this.targetRelays.length) {
+      const failed = this.targetRelays.length - successful;
+      this.logger.debug(`Published event ${event.id} to ${successful}/${this.targetRelays.length} relays (${failed} failed)`);
+    }
   }
   
   setupStatsReporting() {

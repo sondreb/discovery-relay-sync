@@ -57,3 +57,12 @@ Validates and deduplicates incoming events
 Publishes valid events to the target relays
 Provides periodic stats reports
 The sync will run continuously until you stop it with Ctrl+C (SIGINT).
+
+
+## Logging Levels
+
+By default it logs INFO level, you can change with:
+
+```bash
+--log-level debug
+```
