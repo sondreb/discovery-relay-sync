@@ -17,13 +17,14 @@ export class RelayConnector {
     this.options = {
       reconnectInterval: 5000,
       maxRetries: 10,
+      targetRelay: true,
       ...options
     };
     this.logger = logger;
     this.connected = false;
     this.pool = new SimplePool();
     this.retryCount = 0;
-    this.subscriptions = new Map();
+    // this.subscriptions = new Map();
     this.statsTracker = statsTracker || new StatsTracker();
     this.eventQueue = [];
   }
@@ -37,9 +38,8 @@ export class RelayConnector {
       const testSub = this.pool.subscribe([this.url], { kinds: [3, 10002] }, {
         maxWait: 5000,
         onevent: (event) => {
-          console.log('On event:', event);
           this.connected = true;
-          this.logger.info(`Connected to relay: ${this.url}`);
+          // this.logger.info(`Connected to relay: ${this.url}`);
           this.statsTracker.recordConnectionStatus(this.url, 'connected');
           this.processQueuedEvents();
         },
@@ -53,30 +53,6 @@ export class RelayConnector {
       });
 
       return testSub;
-
-      // Set a connection timeout
-      // const timeout = new Promise((_, reject) => {
-      //   setTimeout(() => {
-      //     reject(new Error(`Connection timeout to relay ${this.url}`));
-      //   }, 5000);
-      // });
-
-      // Wait for either connection or timeout
-      // await Promise.race([
-      //   new Promise(resolve => {
-      //     testSub.on('eose', () => {
-      //       this.connected = true;
-      //       testSub.unsub();
-      //       this.logger.info(`Connected to relay: ${this.url}`);
-      //       this.statsTracker.recordConnectionStatus(this.url, 'connected');
-      //       this.processQueuedEvents();
-      //       resolve();
-      //     });
-      //   }),
-      //   timeout
-      // ]);
-
-      // return this.connected;
     } catch (error) {
       this.logger.error(`Failed to connect to relay ${this.url}:`, error);
       this.statsTracker.recordError(`connection_error_${this.url}`);
@@ -101,37 +77,9 @@ export class RelayConnector {
   }
 
   async disconnect() {
-    // if (this.connected) {
       this.logger.debug(`Disconnecting from relay: ${this.url}`);
 
       try {
-        
-        // First, unsubscribe from all subscriptions
-        // const unsubPromises = [];
-        // for (const [subId, sub] of this.subscriptions.entries()) {
-        //   this.logger.debug(`Unsubscribing from subscription ${subId} for ${this.url}`);
-        //   const unsubPromise = new Promise(resolve => {
-        //     // Wait a short time to ensure CLOSE messages are received by the relay
-        //     setTimeout(() => {
-        //       try {
-        //         sub.unsub();
-        //         this.logger.debug(`Successfully unsubscribed from ${subId} for ${this.url}`);
-        //       } catch (e) {
-        //         this.logger.debug(`Error unsubscribing from ${subId}: ${e.message}`);
-        //       }
-        //       resolve();
-        //     }, 100);
-        //   });
-        //   unsubPromises.push(unsubPromise);
-        //   this.subscriptions.delete(subId);
-        // }
-        
-        // Wait for all unsubscribe operations to complete
-        // await Promise.all(unsubPromises);
-        
-        // Pause briefly to allow any pending messages to be processed
-        // await new Promise(resolve => setTimeout(resolve, 500));
-        
         // Now close the pool connection to this relay
         this.logger.debug(`Closing pool connection to ${this.url}`);
         this.pool.close([this.url]);
@@ -148,42 +96,6 @@ export class RelayConnector {
         this.connected = false;
         this.statsTracker.recordConnectionStatus(this.url, 'disconnected');
       }
-    // }
-  }
-
-  subscribe(filters) {
-    if (!this.connected) {
-      this.logger.warn(`Cannot subscribe to relay ${this.url}: not connected`);
-      return null;
-    }
-
-    try {
-      const sub = this.pool.subscribe([this.url], filters);
-      const subId = Math.random().toString(36).substring(2, 15);
-      this.subscriptions.set(subId, sub);
-      this.logger.debug(`Subscribed to relay ${this.url} with filters:`, filters);
-
-      // Add error handling
-      sub.on('error', (error) => {
-        this.logger.error(`Error on subscription for relay ${this.url}:`, error);
-        this.statsTracker.recordError(`subscription_error_${this.url}`);
-      });
-
-      return sub;
-    } catch (error) {
-      this.logger.error(`Failed to subscribe to relay ${this.url}:`, error);
-      this.statsTracker.recordError(`subscription_error_${this.url}`);
-      return null;
-    }
-  }
-
-  unsubscribe(subId) {
-    const sub = this.subscriptions.get(subId);
-    if (sub) {
-      sub.unsub();
-      this.subscriptions.delete(subId);
-      this.logger.debug(`Unsubscribed from relay ${this.url} subscription ${subId}`);
-    }
   }
 
   async publish(event) {

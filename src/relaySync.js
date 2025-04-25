@@ -19,11 +19,11 @@ export class RelaySync {
     this.running = true;
     
     try {
-      // Connect to source relays
-      await this.connectToSourceRelays();
-      
       // Connect to target relays
       await this.connectToTargetRelays();
+      
+      // Connect to source relays
+      await this.connectToSourceRelays();
       
       // Set up regular stats reporting
       this.setupStatsReporting();
@@ -79,19 +79,19 @@ export class RelaySync {
         this.sourceRelays.push(relay);
         
         // Subscribe to kinds 10002 and 3
-        const sub = relay.subscribe([
-          { kinds: [10002, 3] }
-        ]);
+        // const sub = relay.subscribe([
+        //   { kinds: [10002, 3] }
+        // ]);
         
-        if (sub) {
-          sub.on('event', event => {
-            this.handleIncomingEvent(relayUrl, event);
-          });
+        // if (sub) {
+        //   sub.on('event', event => {
+        //     this.handleIncomingEvent(relayUrl, event);
+        //   });
           
-          sub.on('eose', () => {
-            this.logger.debug(`End of stored events from ${relayUrl}`);
-          });
-        }
+        //   sub.on('eose', () => {
+        //     this.logger.debug(`End of stored events from ${relayUrl}`);
+        //   });
+        // }
       }
     }
     
