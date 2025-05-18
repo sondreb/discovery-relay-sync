@@ -2,7 +2,11 @@
 Utility used to sync kind 10002 from other relays and publish to Discovery Relay (also includes load testing)
 
 # Regular sync mode
+```sh
 node index.js -s wss://relay.damus.io,wss://relay.nostr.info -t wss://nos.lol
+
+node index.js --sync true --source wss://purplepag.es --target wss://discovery-eu.nostria.app
+```
 
 # Load testing mode
 # This will spin up 20 threads, one pr. second publish.

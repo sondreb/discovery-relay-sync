@@ -17,6 +17,25 @@ export function parseArgs() {
       type: 'string',
       description: 'Comma-separated list of source relay URLs'
     })
+    .option('conn', {
+      type: 'string',
+      description: 'Azure Storage connection string for event storage',
+    })
+    .option('container', {
+      type: 'string',
+      description: 'Azure Storage container name for storing events',
+      default: 'nostr-events'
+    })
+    .option('target-container', {
+      type: 'string',
+      description: 'Azure Storage container name for storing reconciled events',
+      default: 'nostr-events'
+    })
+    .option('path', {
+      alias: 'p',
+      type: 'string',
+      description: 'Local path to store events'
+    })
     .option('target', {
       alias: 't',
       type: 'string',
@@ -54,9 +73,14 @@ export function parseArgs() {
     targetRelays: [],
     logLevel: argv.logLevel || 'info',
     reconnectInterval: 5000,
-    maxRetries: 10, 
+    maxRetries: 10,
     bufferSize: 1000,
+    sync: argv.sync || false,
+    path: argv.path || '',
     loadTest: argv.loadTest || false,
+    conn: argv.conn,
+    containerName: argv.container || 'nostr-events',
+    targetContainer: argv['target-container'] || 'nostr-events',
     eventsPerSecond: argv.eventsPerSecond || 10,
     testDuration: argv.testDuration || 60,
     threads: 1

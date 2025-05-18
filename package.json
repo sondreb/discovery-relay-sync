@@ -18,10 +18,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@azure/storage-blob": "^12.27.0",
+    "nanoid": "^3.3.6",
     "nostr-tools": "^2.0.0",
     "websocket-polyfill": "^1.0.0",
     "winston": "^3.17.0",
-    "ws": "^8.18.1",
+    "ws": "^8.14.2",
     "yargs": "^17.7.2"
   },
   "type": "module"
